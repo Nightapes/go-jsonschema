@@ -22,7 +22,16 @@ func FromJSONFile(fileName string) (*Schema, error) {
 	defer func() {
 		_ = f.Close()
 	}()
-	return FromJSONReader(f)
+	schema, err := FromJSONReader(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if schema.ID != "" {
+		schema.ID = fileName
+	}
+
+	return schema, nil
 }
 
 func FromJSONReader(r io.Reader) (*Schema, error) {
@@ -30,6 +39,7 @@ func FromJSONReader(r io.Reader) (*Schema, error) {
 	if err := json.NewDecoder(r).Decode(&schema); err != nil {
 		return nil, err
 	}
+
 	return &schema, nil
 }
 
@@ -41,7 +51,16 @@ func FromYAMLFile(fileName string) (*Schema, error) {
 	defer func() {
 		_ = f.Close()
 	}()
-	return FromYAMLReader(f)
+	schema, err := FromYAMLReader(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if schema.ID != "" {
+		schema.ID = fileName
+	}
+
+	return schema, nil
 }
 
 func FromYAMLReader(r io.Reader) (*Schema, error) {
@@ -60,6 +79,7 @@ func FromYAMLReader(r io.Reader) (*Schema, error) {
 	if err = json.Unmarshal(b, &schema); err != nil {
 		return nil, err
 	}
+
 	return &schema, nil
 }
 

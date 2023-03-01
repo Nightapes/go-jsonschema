@@ -155,11 +155,13 @@ func (g *Generator) loadSchemaFromFile(fileName, parentFileName string) (*schema
 		if err != nil {
 			return nil, err
 		}
+
 		g.schemaCacheByFileName[qualified] = schema
 
 		if err = g.addFile(qualified, schema); err != nil {
 			return nil, err
 		}
+
 		return schema, nil
 	}
 	return nil, fmt.Errorf("could not resolve schema %q", fileName)
@@ -167,7 +169,7 @@ func (g *Generator) loadSchemaFromFile(fileName, parentFileName string) (*schema
 
 func (g *Generator) getRootTypeName(schema *schemas.Schema, fileName string) string {
 	for _, m := range g.config.SchemaMappings {
-		if m.SchemaID == schema.ID && m.RootType != "" {
+		if (m.SchemaID == schema.ID || m.SchemaID == fileName) && m.RootType != "" {
 			return m.RootType
 		}
 	}
@@ -311,7 +313,7 @@ func (g *schemaGenerator) generateReferencedType(ref string) (codegen.Type, erro
 		if !strings.HasPrefix(strings.ToLower(scope), "/definitions/") {
 			return nil, fmt.Errorf("unsupported $ref format; must point to definition within file: %q", ref)
 		}
-		defName = scope[13:]
+		defName = g.getRootTypeName(&schemas.Schema{}, fileName)
 	}
 
 	var schema *schemas.Schema
