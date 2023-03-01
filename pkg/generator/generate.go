@@ -127,6 +127,7 @@ func (g *Generator) addFile(fileName string, schema *schemas.Schema) error {
 }
 
 func (g *Generator) loadSchemaFromFile(fileName, parentFileName string) (*schemas.Schema, error) {
+
 	if !filepath.IsAbs(fileName) {
 		fileName = filepath.Join(filepath.Dir(parentFileName), fileName)
 	}
@@ -408,8 +409,7 @@ func (g *schemaGenerator) generateReferencedType(ref string) (codegen.Type, erro
 	}, nil
 }
 
-func (g *schemaGenerator) generateDeclaredType(
-	t *schemas.Type, scope nameScope) (codegen.Type, error) {
+func (g *schemaGenerator) generateDeclaredType(t *schemas.Type, scope nameScope) (codegen.Type, error) {
 	if decl, ok := g.output.declsBySchema[t]; ok {
 		return &codegen.NamedType{Decl: decl}, nil
 	}
@@ -545,6 +545,7 @@ func (g *schemaGenerator) generateType(
 			return &codegen.CustomNameType{Type: *ext.Type}, nil
 		}
 	}
+
 	if t.Enum != nil {
 		return g.generateEnumType(t, scope)
 	}
@@ -789,6 +790,7 @@ func (g *schemaGenerator) generateEnumType(
 	g.output.file.Package.AddDecl(&enumDecl)
 
 	g.output.declsByName[enumDecl.Name] = &enumDecl
+	g.output.declsBySchema[t] = &enumDecl
 
 	valueConstant := &codegen.Var{
 		Name:  "enumValues_" + enumDecl.Name,
@@ -870,6 +872,7 @@ func (o *output) uniqueTypeName(name string) string {
 		return name
 	}
 	count := 1
+
 	for {
 		suffixed := fmt.Sprintf("%s_%d", name, count)
 		if _, ok := o.declsByName[suffixed]; !ok {
