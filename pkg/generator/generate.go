@@ -3,7 +3,6 @@ package generator
 import (
 	"fmt"
 	"go/format"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -803,8 +802,6 @@ func (g *schemaGenerator) generateEnumType(
 		delete(g.output.declsBySchema, t)
 		delete(g.output.declsByName, scope.string())
 	}
-
-	log.Printf("Is imunique %s %t", scope.string(), isUnique)
 
 	enumDecl := codegen.TypeDecl{
 		Name: scope.string(),
