@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"go/format"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,10 +170,11 @@ func (g *Generator) loadSchemaFromFile(fileName, parentFileName string) (*schema
 
 func (g *Generator) getRootTypeName(schema *schemas.Schema, fileName string) string {
 	for _, m := range g.config.SchemaMappings {
-		if (m.SchemaID == schema.ID || m.SchemaID == fileName) && m.RootType != "" {
+		if (m.SchemaID == schema.ID || m.SchemaID == filepath.Base(fileName)) && m.RootType != "" {
 			return m.RootType
 		}
 	}
+
 	return g.identifierFromFileName(fileName)
 }
 
@@ -420,17 +422,23 @@ func (g *schemaGenerator) generateDeclaredType(t *schemas.Type, scope nameScope)
 		return g.generateEnumType(t, scope)
 	}
 
+	isUnique := g.output.uniqueTypeName(scope.string())
+
 	decl := codegen.TypeDecl{
-		Name:    g.output.uniqueTypeName(scope.string()),
+		Name:    scope.string(),
 		Comment: t.Description,
 	}
-	g.output.declsBySchema[t] = &decl
-	g.output.declsByName[decl.Name] = &decl
+
+	if isUnique {
+		g.output.declsBySchema[t] = &decl
+		g.output.declsByName[decl.Name] = &decl
+	}
 
 	theType, err := g.generateType(t, scope)
 	if err != nil {
 		return nil, err
 	}
+
 	if isNamedType(theType) {
 		// Don't declare named types under a new name
 		delete(g.output.declsBySchema, t)
@@ -439,7 +447,9 @@ func (g *schemaGenerator) generateDeclaredType(t *schemas.Type, scope nameScope)
 	}
 	decl.Type = theType
 
-	g.output.file.Package.AddDecl(&decl)
+	if isUnique {
+		g.output.file.Package.AddDecl(&decl)
+	}
 
 	if structType, ok := theType.(*codegen.StructType); ok {
 		var validators []validator
@@ -497,37 +507,39 @@ func (g *schemaGenerator) generateDeclaredType(t *schemas.Type, scope nameScope)
 			}
 
 			g.output.file.Package.AddImport("encoding/json", "")
-			g.output.file.Package.AddDecl(&codegen.Method{
-				Impl: func(out *codegen.Emitter) {
-					out.Comment("UnmarshalJSON implements json.Unmarshaler.")
-					out.Println("func (j *%s) UnmarshalJSON(b []byte) error {", decl.Name)
-					out.Indent(1)
-					out.Println("var %s map[string]interface{}", varNameRawMap)
-					out.Println("if err := json.Unmarshal(b, &%s); err != nil { return err }",
-						varNameRawMap)
-					for _, v := range validators {
-						if v.desc().beforeJSONUnmarshal {
-							v.generate(out)
+			if isUnique {
+				g.output.file.Package.AddDecl(&codegen.Method{
+					Impl: func(out *codegen.Emitter) {
+						out.Comment("UnmarshalJSON implements json.Unmarshaler.")
+						out.Println("func (j *%s) UnmarshalJSON(b []byte) error {", decl.Name)
+						out.Indent(1)
+						out.Println("var %s map[string]interface{}", varNameRawMap)
+						out.Println("if err := json.Unmarshal(b, &%s); err != nil { return err }",
+							varNameRawMap)
+						for _, v := range validators {
+							if v.desc().beforeJSONUnmarshal {
+								v.generate(out)
+							}
 						}
-					}
 
-					out.Println("type Plain %s", decl.Name)
-					out.Println("var %s Plain", varNamePlainStruct)
-					out.Println("if err := json.Unmarshal(b, &%s); err != nil { return err }",
-						varNamePlainStruct)
+						out.Println("type Plain %s", decl.Name)
+						out.Println("var %s Plain", varNamePlainStruct)
+						out.Println("if err := json.Unmarshal(b, &%s); err != nil { return err }",
+							varNamePlainStruct)
 
-					for _, v := range validators {
-						if !v.desc().beforeJSONUnmarshal {
-							v.generate(out)
+						for _, v := range validators {
+							if !v.desc().beforeJSONUnmarshal {
+								v.generate(out)
+							}
 						}
-					}
 
-					out.Println("*j = %s(%s)", decl.Name, varNamePlainStruct)
-					out.Println("return nil")
-					out.Indent(-1)
-					out.Println("}")
-				},
-			})
+						out.Println("*j = %s(%s)", decl.Name, varNamePlainStruct)
+						out.Println("return nil")
+						out.Indent(-1)
+						out.Println("}")
+					},
+				})
+			}
 		}
 	}
 
@@ -785,12 +797,21 @@ func (g *schemaGenerator) generateEnumType(
 		}
 	}
 
+	isUnique := g.output.uniqueTypeName(scope.string())
+
+	if !isUnique {
+		delete(g.output.declsBySchema, t)
+		delete(g.output.declsByName, scope.string())
+	}
+
+	log.Printf("Is imunique %s %t", scope.string(), isUnique)
+
 	enumDecl := codegen.TypeDecl{
-		Name: g.output.uniqueTypeName(scope.string()),
+		Name: scope.string(),
 		Type: enumType,
 	}
-	g.output.file.Package.AddDecl(&enumDecl)
 
+	g.output.file.Package.AddDecl(&enumDecl)
 	g.output.declsByName[enumDecl.Name] = &enumDecl
 	g.output.declsBySchema[t] = &enumDecl
 
@@ -798,6 +819,7 @@ func (g *schemaGenerator) generateEnumType(
 		Name:  "enumValues_" + enumDecl.Name,
 		Value: t.Enum,
 	}
+
 	g.output.file.Package.AddDecl(valueConstant)
 
 	if wrapInStruct {
@@ -869,21 +891,9 @@ type output struct {
 	warner        func(string)
 }
 
-func (o *output) uniqueTypeName(name string) string {
-	if _, ok := o.declsByName[name]; !ok {
-		return name
-	}
-	count := 1
-
-	for {
-		suffixed := fmt.Sprintf("%s_%d", name, count)
-		if _, ok := o.declsByName[suffixed]; !ok {
-			o.warner(fmt.Sprintf(
-				"Multiple types map to the name %q; declaring duplicate as %q instead", name, suffixed))
-			return suffixed
-		}
-		count++
-	}
+func (o *output) uniqueTypeName(name string) bool {
+	_, ok := o.declsByName[name]
+	return !ok
 }
 
 type cachedEnum struct {

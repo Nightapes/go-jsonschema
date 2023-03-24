@@ -27,9 +27,7 @@ func FromJSONFile(fileName string) (*Schema, error) {
 		return nil, err
 	}
 
-	if schema.ID != "" {
-		schema.ID = fileName
-	}
+	schema.ID = fileName
 
 	return schema, nil
 }
