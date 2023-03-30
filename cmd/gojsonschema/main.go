@@ -20,6 +20,7 @@ var (
 	schemaRootTypes   []string
 	capitalizations   []string
 	resolveExtensions []string
+	rootFolder        string
 	yamlExtensions    = []string{".yml", ".yaml"}
 )
 
@@ -60,6 +61,7 @@ var rootCmd = &cobra.Command{
 			SchemaMappings:     []generator.SchemaMapping{},
 			ResolveExtensions:  resolveExtensions,
 			YAMLExtensions:     yamlExtensions,
+			RootFolder:         rootFolder,
 		}
 		for _, id := range allKeys(schemaPackageMap, schemaOutputMap, schemaRootTypeMap) {
 			mapping := generator.SchemaMapping{SchemaID: id}
@@ -123,6 +125,8 @@ func main() {
 	rootCmd.PersistentFlags().StringVarP(&defaultPackage, "package", "p", "",
 		`Default name of package to declare Go files under, unless overridden with
 --schema-package`)
+	rootCmd.PersistentFlags().StringVarP(&rootFolder, "rootFolder", "r", "",
+		`Root folder for relative paths`)
 	rootCmd.PersistentFlags().StringVarP(&defaultOutput, "output", "o", "-",
 		"File to write (- for standard output)")
 	rootCmd.PersistentFlags().StringSliceVar(&schemaPackages, "schema-package", nil,

@@ -20,6 +20,7 @@ type Config struct {
 	YAMLExtensions     []string
 	DefaultPackageName string
 	DefaultOutputName  string
+	RootFolder         string
 	Warner             func(string)
 }
 
@@ -36,6 +37,7 @@ type Generator struct {
 	schemaCacheByFileName map[string]*schemas.Schema
 	inScope               map[qualifiedDefinition]struct{}
 	warner                func(string)
+	rootFolder            string
 }
 
 func New(config Config) (*Generator, error) {
@@ -45,6 +47,7 @@ func New(config Config) (*Generator, error) {
 		schemaCacheByFileName: map[string]*schemas.Schema{},
 		inScope:               map[qualifiedDefinition]struct{}{},
 		warner:                config.Warner,
+		rootFolder:            config.RootFolder,
 	}, nil
 }
 
@@ -129,7 +132,22 @@ func (g *Generator) addFile(fileName string, schema *schemas.Schema) error {
 func (g *Generator) loadSchemaFromFile(fileName, parentFileName string) (*schemas.Schema, error) {
 
 	if !filepath.IsAbs(fileName) {
-		fileName = filepath.Join(filepath.Dir(parentFileName), fileName)
+		fileName = "./" + filepath.Join(filepath.Dir(parentFileName), fileName)
+		root := fileName
+		isFinished := false
+		for isFinished != true {
+			tmp := filepath.Dir(root)
+			if tmp == "." {
+				isFinished = true
+			} else {
+				root = tmp
+			}
+		}
+
+		if root != g.rootFolder {
+			fileName = "./" + filepath.Join(g.rootFolder, fileName)
+		}
+
 	}
 
 	exts := append([]string{""}, g.config.ResolveExtensions...)
