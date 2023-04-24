@@ -185,13 +185,15 @@ func (td *TypeDecl) Generate(out *Emitter) {
 type Type interface {
 	Decl
 	IsNillable() bool
+	IsRecursive() bool
 }
 
 type PointerType struct {
 	Type Type
 }
 
-func (PointerType) IsNillable() bool { return true }
+func (PointerType) IsNillable() bool  { return true }
+func (PointerType) IsRecursive() bool { return false }
 
 func (p PointerType) Generate(out *Emitter) {
 	out.Print("*")
@@ -199,10 +201,12 @@ func (p PointerType) Generate(out *Emitter) {
 }
 
 type ArrayType struct {
-	Type Type
+	Type      Type
+	Recursive bool
 }
 
-func (ArrayType) IsNillable() bool { return true }
+func (ArrayType) IsNillable() bool    { return true }
+func (a ArrayType) IsRecursive() bool { return a.Recursive }
 
 func (a ArrayType) Generate(out *Emitter) {
 	out.Print("[]")
@@ -210,8 +214,9 @@ func (a ArrayType) Generate(out *Emitter) {
 }
 
 type NamedType struct {
-	Package *Package
-	Decl    *TypeDecl
+	Package   *Package
+	Decl      *TypeDecl
+	Recursive bool
 }
 
 func (t NamedType) GetName() string {
@@ -221,6 +226,7 @@ func (t NamedType) GetName() string {
 func (t NamedType) IsNillable() bool {
 	return t.Decl.Type != nil && t.Decl.Type.IsNillable()
 }
+func (t NamedType) IsRecursive() bool { return t.Recursive }
 
 func (t NamedType) Generate(out *Emitter) {
 	if t.Package != nil {
@@ -234,17 +240,20 @@ type PrimitiveType struct {
 	Type string
 }
 
-func (PrimitiveType) IsNillable() bool { return false }
+func (PrimitiveType) IsNillable() bool  { return false }
+func (PrimitiveType) IsRecursive() bool { return false }
 
 func (p PrimitiveType) Generate(out *Emitter) {
 	out.Print(p.Type)
 }
 
 type CustomNameType struct {
-	Type string
+	Type      string
+	Recursive bool
 }
 
-func (CustomNameType) IsNillable() bool { return false }
+func (CustomNameType) IsNillable() bool    { return false }
+func (p CustomNameType) IsRecursive() bool { return p.Recursive }
 
 func (p CustomNameType) Generate(out *Emitter) {
 	out.Print(p.Type)
@@ -252,9 +261,11 @@ func (p CustomNameType) Generate(out *Emitter) {
 
 type MapType struct {
 	KeyType, ValueType Type
+	Recursive          bool
 }
 
-func (MapType) IsNillable() bool { return true }
+func (MapType) IsNillable() bool    { return true }
+func (p MapType) IsRecursive() bool { return p.Recursive }
 
 func (p MapType) Generate(out *Emitter) {
 	out.Print("map[")
@@ -265,7 +276,8 @@ func (p MapType) Generate(out *Emitter) {
 
 type EmptyInterfaceType struct{}
 
-func (EmptyInterfaceType) IsNillable() bool { return true }
+func (EmptyInterfaceType) IsNillable() bool  { return true }
+func (EmptyInterfaceType) IsRecursive() bool { return false }
 
 func (EmptyInterfaceType) Generate(out *Emitter) {
 	out.Print("interface{}")
@@ -273,7 +285,8 @@ func (EmptyInterfaceType) Generate(out *Emitter) {
 
 type NullType struct{}
 
-func (NullType) IsNillable() bool { return true }
+func (NullType) IsNillable() bool  { return true }
+func (NullType) IsRecursive() bool { return false }
 
 func (NullType) Generate(out *Emitter) {
 	out.Print("interface{}")
@@ -284,7 +297,8 @@ type StructType struct {
 	RequiredJSONFields []string
 }
 
-func (StructType) IsNillable() bool { return false }
+func (StructType) IsNillable() bool  { return false }
+func (StructType) IsRecursive() bool { return false }
 
 func (s *StructType) AddField(f StructField) {
 	s.Fields = append(s.Fields, f)

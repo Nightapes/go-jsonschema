@@ -560,7 +560,7 @@ func (g *schemaGenerator) generateDeclaredType(t *schemas.Type, scope nameScope)
 		}
 	}
 
-	return &codegen.NamedType{Decl: &decl}, nil
+	return &codegen.NamedType{Decl: &decl, Recursive: theType.IsRecursive()}, nil
 }
 
 func (g *schemaGenerator) generateType(t *schemas.Type, scope nameScope) (codegen.Type, error) {
@@ -584,7 +584,7 @@ func (g *schemaGenerator) generateType(t *schemas.Type, scope nameScope) (codege
 	}
 
 	if t.Ref == "#" {
-		return &codegen.CustomNameType{Type: scope[0]}, nil
+		return &codegen.CustomNameType{Type: scope[0], Recursive: true}, nil
 	}
 
 	if len(t.Type) == 0 {
@@ -613,7 +613,7 @@ func (g *schemaGenerator) generateType(t *schemas.Type, scope nameScope) (codege
 		if err != nil {
 			return nil, err
 		}
-		return codegen.ArrayType{Type: elemType}, nil
+		return codegen.ArrayType{Type: elemType, Recursive: elemType.IsRecursive()}, nil
 	case schemas.TypeNameObject:
 		return g.generateStructType(t, scope)
 	case schemas.TypeNameNull:
@@ -639,6 +639,7 @@ func (g *schemaGenerator) generateStructType(t *schemas.Type, scope nameScope) (
 		return &codegen.MapType{
 			KeyType:   codegen.PrimitiveType{Type: "string"},
 			ValueType: valueType,
+			Recursive: valueType.IsRecursive(),
 		}, nil
 	}
 
@@ -697,6 +698,21 @@ func (g *schemaGenerator) generateStructType(t *schemas.Type, scope nameScope) (
 			return nil, fmt.Errorf("could not generate type for field %q: %s", name, err)
 		}
 
+		if structField.Type.IsRecursive() {
+			if v, ok := structField.Type.(*codegen.ArrayType); ok {
+				fmt.Printf("##### Is Recursive %+v", v.Type.(*codegen.NamedType).Decl)
+
+				v.Type = &codegen.CustomNameType{
+					Type: scope[0],
+				}
+			} else {
+				structField.Type = &codegen.CustomNameType{
+					Type: scope[0],
+				}
+			}
+
+		}
+
 		if prop.Default != nil {
 			structField.DefaultValue = prop.Default
 		} else if isRequired {
@@ -749,7 +765,7 @@ func (g *schemaGenerator) generateTypeInline(
 					return nil, err
 				}
 			}
-			return &codegen.ArrayType{Type: theType}, nil
+			return &codegen.ArrayType{Type: theType, Recursive: theType.IsRecursive()}, nil
 		}
 	}
 	return g.generateDeclaredType(t, scope)
