@@ -563,8 +563,7 @@ func (g *schemaGenerator) generateDeclaredType(t *schemas.Type, scope nameScope)
 	return &codegen.NamedType{Decl: &decl}, nil
 }
 
-func (g *schemaGenerator) generateType(
-	t *schemas.Type, scope nameScope) (codegen.Type, error) {
+func (g *schemaGenerator) generateType(t *schemas.Type, scope nameScope) (codegen.Type, error) {
 	var typeIndex = 0
 	var typeShouldBePointer bool
 
@@ -580,9 +579,14 @@ func (g *schemaGenerator) generateType(
 	if t.Enum != nil {
 		return g.generateEnumType(t, scope)
 	}
-	if t.Ref != "" {
+	if t.Ref != "" && t.Ref != "#" {
 		return g.generateReferencedType(t.Ref)
 	}
+
+	if t.Ref == "#" {
+		return &codegen.CustomNameType{Type: scope[0]}, nil
+	}
+
 	if len(t.Type) == 0 {
 		return codegen.EmptyInterfaceType{}, nil
 	}
@@ -619,9 +623,7 @@ func (g *schemaGenerator) generateType(
 	}
 }
 
-func (g *schemaGenerator) generateStructType(
-	t *schemas.Type,
-	scope nameScope) (codegen.Type, error) {
+func (g *schemaGenerator) generateStructType(t *schemas.Type, scope nameScope) (codegen.Type, error) {
 	if len(t.Properties) == 0 {
 		if len(t.Required) > 0 {
 			g.warner("Object type with no properties has required fields; " +
