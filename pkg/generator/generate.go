@@ -700,7 +700,6 @@ func (g *schemaGenerator) generateStructType(t *schemas.Type, scope nameScope) (
 
 		if structField.Type.IsRecursive() {
 			if v, ok := structField.Type.(*codegen.ArrayType); ok {
-				fmt.Printf("##### Is Recursive %+v", v.Type.(*codegen.NamedType).Decl)
 
 				v.Type = &codegen.CustomNameType{
 					Type: scope[0],
